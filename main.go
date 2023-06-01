@@ -23,7 +23,7 @@ func main() {
 
 	time.Sleep(time.Second)
 
-	_ = json.NewEncoder(conn).Encode(server.DefaultOption)
+	_ = json.NewEncoder(conn).Encode(server.DefaultOption) // 固定 JSON 编码的部分，约定好下面的内容都是 Gob
 	c := codec.NewGobCodec(conn)
 	for i := 0; i < 5; i++ {
 		h := &codec.Header{
@@ -34,6 +34,6 @@ func main() {
 		_ = c.ReadHeader(h)
 		var reply string
 		_ = c.ReadBody(&reply)
-		log.Println("reply:", reply)
+		log.Println("收到回复：reply:", reply)
 	}
 }

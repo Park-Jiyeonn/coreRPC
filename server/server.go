@@ -72,14 +72,9 @@ func (server *Server) serveCodec(c codec.Codec) {
 	sending := new(sync.Mutex)
 	wg := new(sync.WaitGroup)
 
-	//您说得对，这段代码中的 for 循环会一直运行，因此主goroutine不会执行Wait方法。
-	//实际上，在这个RPC服务器中,
-	//编解码器的关闭是由客户端发起的，因此服务器需要一直等待客户端关闭连接，才能关闭编解码器。
-	//
-	//因此，在这种情况下，使用WaitGroup的主要作用是确保所有请求都已经处理完成，
-	//而不是等待所有goroutine退出。
-	//当所有请求处理完成后，主goroutine会一直等待客户端关闭连接，直到客户端关闭连接后，
-	//主goroutine才会执行编解码器的关闭操作。这样可以确保所有请求都得到了正确的处理，并且服务器在关闭之前不会丢失任何请求。
+	// gpt 好像又瞎写一坨，我看的反正是云里雾里的，今天学了点 WaitGroup 了，其实这里是因为里面有一个 break
+	// 意思是，万一没请求了，然后前面的 handleRequest 没结束，主协程这时候可不能退啊
+	// 于是 Wait 方法起作用咯
 
 	for {
 		req, err := server.readRequest(c)
@@ -136,7 +131,7 @@ func (server *Server) sendResponse(c codec.Codec, h *codec.Header, body interfac
 
 func (server *Server) handleRequest(c codec.Codec, req *request, sending *sync.Mutex, wg *sync.WaitGroup) {
 	defer wg.Done()
-	log.Println(req.h, req.argv.Elem())
+	log.Println("请求头：", req.h, "请求体：", req.argv.Elem())
 	req.reply = reflect.ValueOf(fmt.Sprintf("core-rpc %d", req.h.Seq))
 	server.sendResponse(c, req.h, req.reply.Interface(), sending)
 }
