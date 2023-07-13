@@ -1,39 +1,45 @@
 package main
 
 import (
-	"core-RPC/codec"
+	"core-RPC/client"
 	"core-RPC/server"
-	"encoding/json"
 	"fmt"
 	"log"
 	"net"
+	"sync"
 	"time"
 )
 
-func startServer() {
-	lis, _ := net.Listen("tcp", ":8849")
-	server.Accept(lis)
+func startServer(addr chan string) {
+	l, err := net.Listen("tcp", ":8849")
+	if err != nil {
+		log.Fatal("network error:", err)
+	}
+	log.Println("start rpc server on", l.Addr())
+	addr <- l.Addr().String()
+	server.Accept(l)
 }
 func main() {
-	go startServer()
-	conn, _ := net.Dial("tcp", ":8849")
-	defer func() {
-		_ = conn.Close()
-	}()
+	log.SetFlags(0)
+	addr := make(chan string)
+	go startServer(addr)
+	clientRpc, _ := client.Dial("tcp", <-addr)
+	defer func() { _ = clientRpc.Close() }()
 
 	time.Sleep(time.Second)
-
-	_ = json.NewEncoder(conn).Encode(server.DefaultOption) // 固定 JSON 编码的部分，约定好下面的内容都是 Gob
-	c := codec.NewGobCodec(conn)
+	// send request & receive response
+	var wg sync.WaitGroup
 	for i := 0; i < 5; i++ {
-		h := &codec.Header{
-			ServiceMethod: "Jiyeon's Method",
-			Seq:           uint64(i),
-		}
-		_ = c.Write(h, fmt.Sprintf("geerpc req %d", h.Seq))
-		_ = c.ReadHeader(h)
-		var reply string
-		_ = c.ReadBody(&reply)
-		log.Println("收到回复：reply:", reply)
+		wg.Add(1)
+		go func(i int) {
+			defer wg.Done()
+			args := fmt.Sprintf("geerpc req %d", i)
+			var reply string
+			if err := clientRpc.Call("Foo.Sum", args, &reply); err != nil {
+				log.Fatal("call Foo.Sum error:", err)
+			}
+			log.Println("reply:", reply)
+		}(i)
 	}
+	wg.Wait()
 }
