@@ -3,15 +3,28 @@ package main
 import (
 	"core-RPC/client"
 	"core-RPC/server"
-	"fmt"
 	"log"
 	"net"
 	"sync"
 	"time"
 )
 
+type Foo int
+
+type Args struct{ Num1, Num2 int }
+
+func (f Foo) Sum(args Args, reply *int) error {
+	*reply = args.Num1 + args.Num2
+	return nil
+}
+
 func startServer(addr chan string) {
-	l, err := net.Listen("tcp", ":8849")
+	var foo Foo
+	if err := server.Register(&foo); err != nil {
+		log.Fatal("register error:", err)
+	}
+	// pick a free port
+	l, err := net.Listen("tcp", ":0")
 	if err != nil {
 		log.Fatal("network error:", err)
 	}
@@ -23,8 +36,8 @@ func main() {
 	log.SetFlags(0)
 	addr := make(chan string)
 	go startServer(addr)
-	clientRpc, _ := client.Dial("tcp", <-addr)
-	defer func() { _ = clientRpc.Close() }()
+	rpcClient, _ := client.Dial("tcp", <-addr)
+	defer func() { _ = rpcClient.Close() }()
 
 	time.Sleep(time.Second)
 	// send request & receive response
@@ -33,12 +46,12 @@ func main() {
 		wg.Add(1)
 		go func(i int) {
 			defer wg.Done()
-			args := fmt.Sprintf("geerpc req %d", i)
-			var reply string
-			if err := clientRpc.Call("Foo.Sum", args, &reply); err != nil {
+			args := &Args{Num1: i, Num2: i * i}
+			var reply int
+			if err := rpcClient.Call("Foo.Sum", args, &reply); err != nil {
 				log.Fatal("call Foo.Sum error:", err)
 			}
-			log.Println("reply:", reply)
+			log.Printf("%d + %d = %d", args.Num1, args.Num2, reply)
 		}(i)
 	}
 	wg.Wait()

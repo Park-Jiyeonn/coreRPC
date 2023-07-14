@@ -2,26 +2,31 @@ package main
 
 import (
 	"fmt"
+	"log"
+	"reflect"
+	"strings"
 	"sync"
 )
 
 func main() {
-	c := make(chan int, 10)
-	wg := sync.WaitGroup{}
-	for i := 1; i <= 10; i++ {
-		wg.Add(1)
-		go func(i int) {
-			defer wg.Done()
-			fmt.Println(i, "--> 我被调用了")
-			kk := <-c
-			fmt.Println("拿到 kk ", kk*0+i)
-		}(i)
+	var wg sync.WaitGroup
+	typ := reflect.TypeOf(&wg)
+	fmt.Println("kk = ", reflect.TypeOf(sync.WaitGroup{}).Kind())
+	for i := 0; i < typ.NumMethod(); i++ {
+		method := typ.Method(i)
+		argv := make([]string, 0, method.Type.NumIn())
+		returns := make([]string, 0, method.Type.NumOut())
+		// j 从 1 开始，第 0 个入参是 wg 自己。
+		for j := 1; j < method.Type.NumIn(); j++ {
+			argv = append(argv, method.Type.In(j).Name())
+		}
+		for j := 0; j < method.Type.NumOut(); j++ {
+			returns = append(returns, method.Type.Out(j).Name())
+		}
+		log.Printf("func (w *%s) %s(%s) %s",
+			typ.Elem().Name(),
+			method.Name,
+			strings.Join(argv, ","),
+			strings.Join(returns, ","))
 	}
-
-	fmt.Println("我要放东西进去了，不知道那边怎么样")
-	for i := 1; i <= 10; i++ {
-		c <- i
-	}
-
-	wg.Wait()
 }
