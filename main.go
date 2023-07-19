@@ -6,6 +6,7 @@ import (
 	"core-RPC/server"
 	"log"
 	"net"
+	"net/http"
 	"sync"
 	"time"
 )
@@ -21,24 +22,16 @@ func (f Foo) Sum(args Args, reply *int) error {
 
 func startServer(addr chan string) {
 	var foo Foo
-	if err := server.Register(&foo); err != nil {
-		log.Fatal("register error:", err)
-	}
-	// pick a free port
-	l, err := net.Listen("tcp", ":0")
-	if err != nil {
-		log.Fatal("network error:", err)
-	}
-	log.Println("start rpc server on", l.Addr())
+	l, _ := net.Listen("tcp", ":9999")
+	_ = server.Register(&foo)
+	server.HandleHTTP()
 	addr <- l.Addr().String()
-	server.Accept(l)
+	_ = http.Serve(l, nil)
 }
-func main() {
-	log.SetFlags(0)
-	addr := make(chan string)
-	go startServer(addr)
-	rpcClient, _ := client.Dial("tcp", <-addr)
-	defer func() { _ = rpcClient.Close() }()
+
+func call(addrCh chan string) {
+	client1, _ := client.DialHTTP("tcp", <-addrCh)
+	defer func() { _ = client1.Close() }()
 
 	time.Sleep(time.Second)
 	// send request & receive response
@@ -49,12 +42,17 @@ func main() {
 			defer wg.Done()
 			args := &Args{Num1: i, Num2: i * i}
 			var reply int
-			ctx, _ := context.WithTimeout(context.Background(), 10*time.Second)
-			if err := rpcClient.Call(ctx, "Foo.Sum", args, &reply); err != nil {
+			if err := client1.Call(context.Background(), "Foo.Sum", args, &reply); err != nil {
 				log.Fatal("call Foo.Sum error:", err)
 			}
 			log.Printf("%d + %d = %d", args.Num1, args.Num2, reply)
 		}(i)
 	}
 	wg.Wait()
+}
+func main() {
+	log.SetFlags(0)
+	ch := make(chan string)
+	go call(ch)
+	startServer(ch)
 }
