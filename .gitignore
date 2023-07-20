@@ -39,5 +39,5 @@ dumped_hertz_remote_config.json
 /cmd/interact/output
 /cmd/social/output
 
-/main
-/Test
+/main/main
+/test/test

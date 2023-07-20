@@ -1,3 +1,3 @@
-module core-RPC
+module coreRPC
 
 go 1.20
