@@ -7,6 +7,7 @@ import (
 	"sync/atomic"
 )
 
+// 方法名，入参，返回结果，方法被调用次数
 type methodType struct {
 	method    reflect.Method
 	ArgType   reflect.Type
@@ -20,7 +21,7 @@ func (m *methodType) NumCalls() uint64 {
 
 func (m *methodType) newArgv() reflect.Value {
 	var argv reflect.Value
-	// arg may be a pointer type, or a value type
+	// arg may be a pointer type, or a objValue type
 	if m.ArgType.Kind() == reflect.Ptr {
 		argv = reflect.New(m.ArgType.Elem())
 	} else {
@@ -41,18 +42,19 @@ func (m *methodType) newReplyv() reflect.Value {
 	return replyv
 }
 
+// 结构体的名字，类型，对象的值，方法
 type service struct {
-	name   string
-	typ    reflect.Type
-	rcvr   reflect.Value
-	method map[string]*methodType
+	name     string
+	objType  reflect.Type
+	objValue reflect.Value
+	method   map[string]*methodType
 }
 
 func newService(rcvr interface{}) *service {
 	s := new(service)
-	s.rcvr = reflect.ValueOf(rcvr)
-	s.name = reflect.Indirect(s.rcvr).Type().Name()
-	s.typ = reflect.TypeOf(rcvr)
+	s.objValue = reflect.ValueOf(rcvr)
+	s.name = reflect.Indirect(s.objValue).Type().Name()
+	s.objType = reflect.TypeOf(rcvr)
 	if !ast.IsExported(s.name) {
 		log.Fatalf("rpc server: %s is not a valid service name", s.name)
 	}
@@ -62,8 +64,8 @@ func newService(rcvr interface{}) *service {
 
 func (s *service) registerMethods() {
 	s.method = make(map[string]*methodType)
-	for i := 0; i < s.typ.NumMethod(); i++ {
-		method := s.typ.Method(i)
+	for i := 0; i < s.objType.NumMethod(); i++ {
+		method := s.objType.Method(i)
 		mType := method.Type
 		if mType.NumIn() != 3 || mType.NumOut() != 1 {
 			continue
@@ -84,10 +86,10 @@ func (s *service) registerMethods() {
 	}
 }
 
-func (s *service) call(m *methodType, argv, replyv reflect.Value) error {
-	atomic.AddUint64(&m.numCalls, 1)
-	f := m.method.Func
-	returnValues := f.Call([]reflect.Value{s.rcvr, argv, replyv})
+func (s *service) call(methodType *methodType, argv, replyv reflect.Value) error {
+	atomic.AddUint64(&methodType.numCalls, 1)
+	f := methodType.method.Func
+	returnValues := f.Call([]reflect.Value{s.objValue, argv, replyv})
 	if errInter := returnValues[0].Interface(); errInter != nil {
 		return errInter.(error)
 	}

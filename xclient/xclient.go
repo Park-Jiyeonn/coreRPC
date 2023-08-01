@@ -8,6 +8,9 @@ import (
 	"sync"
 )
 
+// XClient 包含多个客户端，每个客户端对应着不同的服务器地址
+// 支持单独 Call，还支持广播
+// call 的时候，如果 map 中的客户端不存在，会创建一个新的客户端
 type XClient struct {
 	d       Discovery
 	mode    SelectMode

@@ -16,11 +16,8 @@ import (
 	"time"
 )
 
-// Copyright 2009 The Go Authors. All rights reserved.
-// Use of this source code is governed by a BSD-style
-// license that can be found in the LICENSE file.
-
-// Call represents an active RPC.
+// Call 是客户端发起的一次请求，Done中写入内容的话，标志着本次请求结束了。
+// 发生错误也会终止请求。结束后会被客户端删除
 type Call struct {
 	Seq           uint64
 	ServiceMethod string      // format "<service>.<method>"
@@ -34,10 +31,9 @@ func (call *Call) done() {
 	call.Done <- call
 }
 
-// Client represents an RPC Client.
-// There may be multiple outstanding Calls associated
-// with a single Client, and a Client may be used by
-// multiple goroutines simultaneously.
+// Client 中最核心的是消息的编解码器
+// opt 是初始化客户端的时候，会用 json 发送的内容，包含接下来的编解码方式、连接过期时间、处理请求过期时间
+// header 中带上的是请求方法
 type Client struct {
 	cc       codec.Codec
 	opt      *Option

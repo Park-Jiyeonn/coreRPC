@@ -18,7 +18,7 @@ import (
 const MagicNumber = 114514
 
 type Option struct {
-	MagicNumber    int           // MagicNumber marks this's a geerpc request
+	MagicNumber    int           // MagicNumber marks this is a geerpc request
 	CodecType      string        // client may choose different Codec to encode body
 	ConnectTimeout time.Duration // 0 means no limit
 	HandleTimeout  time.Duration
@@ -30,21 +30,18 @@ var DefaultOption = &Option{
 	ConnectTimeout: time.Second * 10,
 }
 
-// Server represents an RPC Server.
+// Server 服务端，可以注册很多方法到 serviceMap 中，因为读多写少，所以用 sync.map
 type Server struct {
 	serviceMap sync.Map
 }
 
-// NewServer returns a new Server.
 func NewServer() *Server {
 	return &Server{}
 }
 
-// DefaultServer is the default instance of *Server.
 var DefaultServer = NewServer()
 
-// ServeConn runs the server on a single connection.
-// ServeConn blocks, serving the connection until the client hangs up.
+// ServeConn 处理单个连接，发生错误时才结束处理
 func (server *Server) ServeConn(conn io.ReadWriteCloser) {
 	defer func() { _ = conn.Close() }()
 	var opt Option
@@ -64,9 +61,10 @@ func (server *Server) ServeConn(conn io.ReadWriteCloser) {
 	server.serveCodec(f(conn), &opt)
 }
 
-// invalidRequest is a placeholder for response argv when error occurs
 var invalidRequest = struct{}{}
 
+// 读请求头，从 serviceMethod 中分离出结构体名称，从而找到对应 service
+// 利用 service 中的 map，找到 methodType，然后构造好空的入参出参对象，这样就可以读取请求体了
 func (server *Server) serveCodec(cc codec.Codec, opt *Option) {
 	sending := new(sync.Mutex) // make sure to send a complete response
 	wg := new(sync.WaitGroup)  // wait until all request are handled
@@ -89,10 +87,10 @@ func (server *Server) serveCodec(cc codec.Codec, opt *Option) {
 
 // request stores all information of a call
 type request struct {
-	h            *codec.Header // header of request
-	argv, replyv reflect.Value // argv and replyv of request
-	mtype        *methodType
-	svc          *service
+	h                    *codec.Header // header of request
+	argValue, replyValue reflect.Value // argValue and replyValue of request
+	methodType           *methodType
+	service              *service
 }
 
 func (server *Server) readRequestHeader(cc codec.Codec) (*codec.Header, error) {
@@ -132,17 +130,17 @@ func (server *Server) readRequest(cc codec.Codec) (*request, error) {
 		return nil, err
 	}
 	req := &request{h: h}
-	req.svc, req.mtype, err = server.findService(h.ServiceMethod)
+	req.service, req.methodType, err = server.findService(h.ServiceMethod)
 	if err != nil {
 		return req, err
 	}
-	req.argv = req.mtype.newArgv()
-	req.replyv = req.mtype.newReplyv()
+	req.argValue = req.methodType.newArgv()
+	req.replyValue = req.methodType.newReplyv()
 
 	// make sure that argvi is a pointer, ReadBody need a pointer as parameter
-	argvi := req.argv.Interface()
-	if req.argv.Type().Kind() != reflect.Ptr {
-		argvi = req.argv.Addr().Interface()
+	argvi := req.argValue.Interface()
+	if req.argValue.Type().Kind() != reflect.Ptr {
+		argvi = req.argValue.Addr().Interface()
 	}
 	if err = cc.ReadBody(argvi); err != nil {
 		log.Println("rpc server: read body err:", err)
@@ -164,7 +162,7 @@ func (server *Server) handleRequest(cc codec.Codec, req *request, sending *sync.
 	called := make(chan struct{})
 	sent := make(chan struct{})
 	go func() {
-		err := req.svc.call(req.mtype, req.argv, req.replyv)
+		err := req.service.call(req.methodType, req.argValue, req.replyValue)
 		called <- struct{}{}
 		if err != nil {
 			req.h.Error = err.Error()
@@ -172,7 +170,7 @@ func (server *Server) handleRequest(cc codec.Codec, req *request, sending *sync.
 			sent <- struct{}{}
 			return
 		}
-		server.sendResponse(cc, req.h, req.replyv.Interface(), sending)
+		server.sendResponse(cc, req.h, req.replyValue.Interface(), sending)
 		sent <- struct{}{}
 	}()
 
@@ -203,16 +201,8 @@ func (server *Server) Accept(lis net.Listener) {
 	}
 }
 
-// Accept accepts connections on the listener and serves requests
-// for each incoming connection.
 func Accept(lis net.Listener) { DefaultServer.Accept(lis) }
 
-// Register publishes in the server the set of methods of the
-// receiver value that satisfy the following conditions:
-//   - exported method of exported type
-//   - two arguments, both of exported type
-//   - the second argument is a pointer
-//   - one return value, of type error
 func (server *Server) Register(rcvr interface{}) error {
 	s := newService(rcvr)
 	if _, dup := server.serviceMap.LoadOrStore(s.name, s); dup {
@@ -230,7 +220,7 @@ const (
 	defaultDebugPath = "/debug/geerpc"
 )
 
-// ServeHTTP implements an http.Handler that answers RPC requests.
+// ServeHTTP implements a http.Handler that answers RPC requests.
 func (server *Server) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	if req.Method != "CONNECT" {
 		w.Header().Set("Content-Type", "text/plain; charset=utf-8")
@@ -247,16 +237,13 @@ func (server *Server) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	server.ServeConn(conn)
 }
 
-// HandleHTTP registers an HTTP handler for RPC messages on rpcPath,
-// and a debugging handler on debugPath.
-// It is still necessary to invoke http.Serve(), typically in a go statement.
+// HandleHTTP 注册路由
 func (server *Server) HandleHTTP() {
 	http.Handle(defaultRPCPath, server)
 	http.Handle(defaultDebugPath, debugHTTP{server})
 	log.Println("rpc server debug path:", defaultDebugPath)
 }
 
-// HandleHTTP is a convenient approach for default server to register HTTP handlers
 func HandleHTTP() {
 	DefaultServer.HandleHTTP()
 }

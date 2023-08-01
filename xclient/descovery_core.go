@@ -7,6 +7,9 @@ import (
 	"time"
 )
 
+// GeeRegistryDiscovery 服务发现中心，包含注册中心的地址，timeout 是自定义的过期时间
+// 要是超过了，就要发送 post 请求；没超过，对于 refresh 就不发送，直接 return
+// MultiServersDiscovery 是执行负载均衡策略的，里面包含着服务端地址、锁。
 type GeeRegistryDiscovery struct {
 	*MultiServersDiscovery
 	registry   string

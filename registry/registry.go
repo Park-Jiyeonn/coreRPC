@@ -9,12 +9,11 @@ import (
 	"time"
 )
 
-// GeeRegistry is a simple register center, provide following functions.
-// add a server and receive heartbeat to keep it alive.
-// returns all alive servers and delete dead servers sync simultaneously.
+// GeeRegistry -- 注册中心，使用时先让 http 服务跑起来，
+// 接收 http 请求，返回可用的服务或者刷新指定服务
 type GeeRegistry struct {
-	timeout time.Duration
-	mu      sync.Mutex // protect following
+	timeout time.Duration // 返回可用的服务的时候用得上，servers 中存的是 start time
+	mu      sync.Mutex    // protect following
 	servers map[string]*ServerItem
 }
 
