@@ -2,9 +2,14 @@ package main
 
 import (
 	"bufio"
+	"context"
 	"encoding/gob"
 	"fmt"
+	"github.com/Park-Jiyeonn/coreRPC/xclient"
+	"github.com/gin-gonic/gin"
 	"net"
+	"net/http"
+	"time"
 )
 
 type Header struct {
@@ -77,9 +82,44 @@ func server(addr chan string) {
 	}
 }
 
+var d *xclient.GeeRegistryDiscovery
+var xc *xclient.XClient
+
+type Treasure struct {
+	Value  int `json:"value"`
+	Weight int `json:"weight"`
+}
+type TreasureResponse struct {
+	StatusCode int        `json:"status_code"`
+	StatusMsg  string     `json:"status_msg"`
+	Treasure   []Treasure `json:"treasure"`
+	Capacity   int        `json:"capacity"`
+	Limit      int        `json:"limit"`
+}
+
 func main() {
-	addr := make(chan string)
-	go client(addr)
-	server(addr)
-	//time.Sleep(3 * time.Second)
+
+	defer func() { _ = xc.Close() }()
+	// send request & receive response
+
+	r := gin.Default()
+	r.POST("/kk", func(c *gin.Context) {
+		n := 50
+		resp := new(TreasureResponse)
+		if d == nil || xc == nil {
+			d = xclient.NewGeeRegistryDiscovery("http://localhost:9999/_geerpc_/registry", 0)
+			xc = xclient.NewXClient(d, xclient.RandomSelect, nil)
+		}
+		ctx, _ := context.WithTimeout(context.Background(), time.Second*1)
+		err := xc.Call(ctx, "Treasure.GetTreasure", n, resp)
+		if err != nil {
+			fmt.Println(err.Error())
+			c.String(400, err.Error())
+			return
+		}
+		fmt.Println(resp)
+		c.JSON(http.StatusOK, resp)
+	})
+
+	r.Run(":10134")
 }

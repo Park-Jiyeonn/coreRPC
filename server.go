@@ -199,6 +199,7 @@ func (server *Server) Accept(lis net.Listener) {
 			log.Println("rpc server: accept error:", err)
 			return
 		}
+		//fmt.Println("新一次！")
 		go server.ServeConn(conn)
 	}
 }

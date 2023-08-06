@@ -50,7 +50,7 @@ func checkValid(treasure []Treasure, capacity, limit int) bool {
 			dp[j] = max(dp[j], dp[j-treasure[i].Weight]+treasure[i].Value)
 		}
 	}
-	fmt.Println("最多这么多：", dp[capacity])
+	//fmt.Println("最多这么多：", dp[capacity])
 	return dp[capacity] <= limit
 }
 
@@ -65,7 +65,7 @@ func (t Treasure) GetTreasure(args int, resp *TreasureResponse) error {
 		treasure = generate(treasure)
 		capacity = rand.Intn(1000) + 1
 		limit = rand.Intn(100) + 500
-		fmt.Printf("第 %d 次生成\n", i)
+		//fmt.Printf("第 %d 次生成\n", i)
 		if checkValid(treasure, capacity, limit) {
 			generateSuccess = true
 			break
@@ -97,7 +97,7 @@ func startRegistry(wg *sync.WaitGroup) {
 
 func startServer(registryAddr string) {
 	treasure := new(Treasure)
-	l, _ := net.Listen("tcp", "110.42.239.202:9365")
+	l, _ := net.Listen("tcp", ":9365")
 	server := coreRPC.NewServer()
 	_ = server.Register(treasure)
 	registry.Heartbeat(registryAddr, "tcp@"+l.Addr().String(), 0)
