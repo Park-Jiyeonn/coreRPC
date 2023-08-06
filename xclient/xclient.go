@@ -2,7 +2,7 @@ package xclient
 
 import (
 	"context"
-	. "coreRPC"
+	. "github.com/Park-Jiyeonn/coreRPC"
 	"io"
 	"reflect"
 	"sync"

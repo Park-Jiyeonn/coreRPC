@@ -2,10 +2,10 @@ package main
 
 import (
 	"context"
-	"coreRPC"
-	"coreRPC/registry"
-	"coreRPC/xclient"
 	"fmt"
+	"github.com/Park-Jiyeonn/coreRPC"
+	"github.com/Park-Jiyeonn/coreRPC/registry"
+	"github.com/Park-Jiyeonn/coreRPC/xclient"
 	"log"
 	"math/rand"
 	"net"

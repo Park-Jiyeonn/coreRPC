@@ -1,10 +1,10 @@
 package coreRPC
 
 import (
-	"coreRPC/codec"
 	"encoding/json"
 	"errors"
 	"fmt"
+	"github.com/Park-Jiyeonn/coreRPC/codec"
 	"io"
 	"log"
 	"net"

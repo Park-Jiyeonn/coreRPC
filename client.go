@@ -3,10 +3,10 @@ package coreRPC
 import (
 	"bufio"
 	"context"
-	"coreRPC/codec"
 	"encoding/json"
 	"errors"
 	"fmt"
+	"github.com/Park-Jiyeonn/coreRPC/codec"
 	"io"
 	"log"
 	"net"
