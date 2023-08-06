@@ -313,7 +313,6 @@ func XDial(rpcAddr string, opts ...*Option) (*Client, error) {
 	// delete 110.42.239.202
 	if strings.Contains(addr, "[::]") {
 		parts = strings.Split(addr, "[::]")
-		fmt.Println("arrd = ", parts, len(parts))
 		addr = "110.42.239.202" + parts[1]
 	}
 
