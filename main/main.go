@@ -5,25 +5,88 @@ import (
 	"coreRPC"
 	"coreRPC/registry"
 	"coreRPC/xclient"
+	"fmt"
 	"log"
+	"math/rand"
 	"net"
 	"net/http"
 	"sync"
 	"time"
 )
 
-type Foo int
-
-type Args struct{ Num1, Num2 int }
-
-func (f Foo) Sum(args Args, reply *int) error {
-	*reply = args.Num1 + args.Num2
-	return nil
+type Treasure struct {
+	Value  int `json:"value"`
+	Weight int `json:"weight"`
 }
 
-func (f Foo) Sleep(args Args, reply *int) error {
-	time.Sleep(time.Second * time.Duration(args.Num1))
-	*reply = args.Num1 + args.Num2
+type TreasureResponse struct {
+	StatusCode int        `json:"status_code"`
+	StatusMsg  string     `json:"status_msg"`
+	Treasure   []Treasure `json:"treasure"`
+	Capacity   int        `json:"capacity"`
+	Limit      int        `json:"limit"`
+}
+
+func generate(treasure []Treasure) []Treasure {
+	n := len(treasure)
+	for i := 0; i < n; i++ {
+		treasure[i].Value = rand.Intn(50) + 1
+		treasure[i].Value = rand.Intn(50) + 1
+	}
+	return treasure
+}
+
+func max(x, y int) int {
+	if x > y {
+		return x
+	}
+	return y
+}
+func checkValid(treasure []Treasure, capacity, limit int) bool {
+	n := len(treasure)
+	dp := make([]int, capacity+1)
+	for i := 0; i < n; i++ {
+		for j := capacity; j >= treasure[i].Weight; j-- {
+			dp[j] = max(dp[j], dp[j-treasure[i].Weight]+treasure[i].Value)
+		}
+	}
+	return dp[capacity] <= limit
+}
+
+func (t Treasure) GetTreasure(args int, resp *TreasureResponse) error {
+	n := args
+	treasure := make([]Treasure, n)
+	capacity := 0
+	limit := 0
+	generateSuccess := false
+
+	for i := 0; i < 1000; i++ {
+		treasure = generate(treasure)
+		capacity = rand.Intn(1000) + 1
+		limit = rand.Intn(500) + 1
+		fmt.Printf("第 %d 次生成\n", i)
+		fmt.Println(capacity, limit)
+		if checkValid(treasure, capacity, limit) {
+			generateSuccess = true
+			break
+		}
+	}
+
+	if !generateSuccess {
+		treasure[0].Value, treasure[0].Weight = limit, capacity
+		for i := 1; i < 50; i++ {
+			treasure[i].Value, treasure[i].Weight = 0, 0
+		}
+	}
+
+	resp.StatusCode = 200
+	resp.StatusMsg = "success"
+	resp.Treasure = treasure
+	resp.Capacity = capacity
+	resp.Limit = limit
+
+	fmt.Println(resp)
+
 	return nil
 }
 
@@ -35,29 +98,13 @@ func startRegistry(wg *sync.WaitGroup) {
 }
 
 func startServer(registryAddr string, wg *sync.WaitGroup) {
-	var foo Foo
+	treasure := new(Treasure)
 	l, _ := net.Listen("tcp", ":0")
 	server := coreRPC.NewServer()
-	_ = server.Register(&foo)
+	_ = server.Register(treasure)
 	registry.Heartbeat(registryAddr, "tcp@"+l.Addr().String(), 0)
 	wg.Done()
 	server.Accept(l)
-}
-
-func foo(xc *xclient.XClient, ctx context.Context, typ, serviceMethod string, args *Args) {
-	var reply int
-	var err error
-	switch typ {
-	case "call":
-		err = xc.Call(ctx, serviceMethod, args, &reply)
-	case "broadcast":
-		err = xc.Broadcast(ctx, serviceMethod, args, &reply)
-	}
-	if err != nil {
-		log.Printf("%s %s error: %v", typ, serviceMethod, err)
-	} else {
-		log.Printf("%s %s success: %d + %d = %d", typ, serviceMethod, args.Num1, args.Num2, reply)
-	}
 }
 
 func call(registry string) {
@@ -65,33 +112,13 @@ func call(registry string) {
 	xc := xclient.NewXClient(d, xclient.RandomSelect, nil)
 	defer func() { _ = xc.Close() }()
 	// send request & receive response
-	var wg sync.WaitGroup
-	for i := 0; i < 5; i++ {
-		wg.Add(1)
-		go func(i int) {
-			defer wg.Done()
-			foo(xc, context.Background(), "call", "Foo.Sum", &Args{Num1: i, Num2: i * i})
-		}(i)
+	resp := new(TreasureResponse)
+	ctx, _ := context.WithTimeout(context.Background(), time.Second*2)
+	err := xc.Call(ctx, "Treasure.GetTreasure", 50, resp)
+	if err != nil {
+		fmt.Println(err.Error())
 	}
-	wg.Wait()
-}
-
-func broadcast(registry string) {
-	d := xclient.NewGeeRegistryDiscovery(registry, 0)
-	xc := xclient.NewXClient(d, xclient.RandomSelect, nil)
-	defer func() { _ = xc.Close() }()
-	var wg sync.WaitGroup
-	for i := 0; i < 5; i++ {
-		wg.Add(1)
-		go func(i int) {
-			defer wg.Done()
-			foo(xc, context.Background(), "broadcast", "Foo.Sum", &Args{Num1: i, Num2: i * i})
-			// expect 2 - 5 timeout
-			ctx, _ := context.WithTimeout(context.Background(), time.Second*2)
-			foo(xc, ctx, "broadcast", "Foo.Sleep", &Args{Num1: i, Num2: i * i})
-		}(i)
-	}
-	wg.Wait()
+	fmt.Println(resp)
 }
 
 func main() {
@@ -103,12 +130,10 @@ func main() {
 	wg.Wait()
 
 	time.Sleep(time.Second)
-	wg.Add(2)
-	go startServer(registryAddr, &wg)
+	wg.Add(1)
 	go startServer(registryAddr, &wg)
 	wg.Wait()
 
 	time.Sleep(time.Second)
 	call(registryAddr)
-	broadcast(registryAddr)
 }

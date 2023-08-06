@@ -28,4 +28,5 @@ var NewCodecFuncMap map[string]NewCodecFunc
 func init() {
 	NewCodecFuncMap = make(map[string]NewCodecFunc)
 	NewCodecFuncMap[GobType] = NewGobCodec
+	NewCodecFuncMap[JsonType] = NewJSONCodec
 }

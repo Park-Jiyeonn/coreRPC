@@ -26,7 +26,7 @@ type Option struct {
 
 var DefaultOption = &Option{
 	MagicNumber:    MagicNumber,
-	CodecType:      codec.GobType,
+	CodecType:      codec.JsonType,
 	ConnectTimeout: time.Second * 10,
 }
 
@@ -95,12 +95,14 @@ type request struct {
 
 func (server *Server) readRequestHeader(cc codec.Codec) (*codec.Header, error) {
 	var h codec.Header
+	//fmt.Println("这里 1 号")
 	if err := cc.ReadHeader(&h); err != nil {
 		if err != io.EOF && err != io.ErrUnexpectedEOF {
 			log.Println("rpc server: read header error:", err)
 		}
 		return nil, err
 	}
+	//fmt.Println("这里 2 号")
 	return &h, nil
 }
 
