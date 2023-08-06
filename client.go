@@ -309,6 +309,14 @@ func XDial(rpcAddr string, opts ...*Option) (*Client, error) {
 		return nil, fmt.Errorf("rpc client err: wrong format '%s', expect protocol@addr", rpcAddr)
 	}
 	protocol, addr := parts[0], parts[1]
+	// TODO:
+	// delete 110.42.239.202
+	if strings.Contains(addr, "[::]") {
+		parts = strings.Split(addr, "[::]")
+		fmt.Println("arrd = ", parts, len(parts))
+		addr = "110.42.239.202" + parts[1]
+	}
+
 	switch protocol {
 	case "http":
 		return DialHTTP("tcp", addr, opts...)

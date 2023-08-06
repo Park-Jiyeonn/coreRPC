@@ -95,9 +95,10 @@ func startRegistry(wg *sync.WaitGroup) {
 	_ = http.Serve(l, nil)
 }
 
-func startServer(registryAddr string) {
+func startServer(registryAddr string, port string) {
 	treasure := new(Treasure)
-	l, _ := net.Listen("tcp", ":9365")
+
+	l, _ := net.Listen("tcp", port)
 	server := coreRPC.NewServer()
 	_ = server.Register(treasure)
 	registry.Heartbeat(registryAddr, "tcp@"+l.Addr().String(), 0)
@@ -126,7 +127,7 @@ func main() {
 	go startRegistry(&wg)
 	wg.Wait()
 
-	startServer(registryAddr)
+	startServer(registryAddr, ":9365")
 }
 
 //
